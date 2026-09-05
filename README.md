@@ -1,5 +1,7 @@
 # evalpower
 
+[![CI](https://github.com/alejandro-publius/evalpower/actions/workflows/ci.yml/badge.svg)](https://github.com/alejandro-publius/evalpower/actions/workflows/ci.yml)
+
 **The same 600 evaluations. The same pass or fail bit on every single item. Asked as one question, the eval returns a confident PASS. Split into twelve sub-components, the same evidence returns seven INDETERMINATE verdicts and one FAIL on a component that was never actually broken.**
 
 Nothing was added or removed between those two runs. `examples/single_question.csv` and `examples/decomposed.csv` contain the same 600 items with the same outcomes, and differ only in the `dimension` column. Every difference in the report below comes from splitting one estimate into twelve and testing twelve hypotheses against the same bar.
