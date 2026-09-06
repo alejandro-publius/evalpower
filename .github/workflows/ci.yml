@@ -42,3 +42,29 @@ jobs:
 
       - name: CLI smoke
         run: evalpower --help
+
+  package:
+    # The README's install line is `pip install`, so the artifact that line
+    # produces is part of the contract: build the sdist and wheel and run
+    # twine's metadata check on both.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+
+      - name: Check
+        run: python -m twine check dist/*
+
+      - name: Install the wheel and run the CLI
+        run: |
+          pip install dist/*.whl
+          evalpower --help
