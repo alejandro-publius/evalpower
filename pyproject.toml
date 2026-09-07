@@ -21,7 +21,11 @@ classifiers = [
 dependencies = ["numpy>=1.21", "pandas>=1.3"]
 
 [project.optional-dependencies]
-test = ["pytest>=7.0"]
+# statsmodels and scipy are test-only: tests/test_oracle.py cross-checks the
+# Wilson interval and score test against statsmodels' independent
+# implementation, so a shared bug in evalpower's own arithmetic cannot also
+# be a shared bug in the expected value.
+test = ["pytest>=7.0", "statsmodels>=0.14", "scipy>=1.10"]
 
 [project.scripts]
 evalpower = "evalpower.cli:main"
@@ -34,3 +38,18 @@ packages = ["evalpower"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+# 120 covers every line already in the repo (the longest, in
+# examples/generate.py, is 116) without forcing a reflow of existing code.
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+# Pyflakes and pycodestyle errors, import sorting, flake8-bugbear (real bug
+# patterns: mutable defaults, bare except, etc.) and flake8-comprehensions.
+# Deliberately not pyupgrade (UP): the codebase consistently uses
+# str.format() and typing.List/Dict/Optional rather than f-strings and
+# builtin generics, for uniformity across a 3.9-and-up range, and pyupgrade
+# would flag that whole, intentional style rather than a real defect.
+select = ["E", "F", "I", "B", "C4"]
