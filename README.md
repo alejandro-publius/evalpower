@@ -1,6 +1,8 @@
 # evalpower
 
 [![CI](https://github.com/alejandro-publius/evalpower/actions/workflows/ci.yml/badge.svg)](https://github.com/alejandro-publius/evalpower/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/alejandro-publius/evalpower)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](pyproject.toml)
 
 **The same 600 evaluations. The same pass or fail bit on every single item. Asked as one question, the eval returns a confident PASS. Split into twelve sub-components, the same evidence returns seven INDETERMINATE verdicts and one FAIL on a component that was never actually broken.**
 
@@ -9,6 +11,7 @@ Nothing was added or removed between those two runs. `examples/single_question.c
 ## The two example outputs, side by side
 
 ```bash
+pip install -e .
 evalpower examples/single_question.csv
 ```
 
@@ -126,10 +129,11 @@ python examples/generate.py --sweep 3000
 ```
 
 ```
-single_question_pass_rate:             0.9483
-runs_with_at_least_one_spurious_fail:  0.1780
-mean_indeterminate_dimensions:         7.7243
-mean_spurious_fails:                   0.1937
+runs: 3000.0000
+single_question_pass_rate: 0.9483
+runs_with_at_least_one_spurious_fail: 0.1780
+mean_indeterminate_dimensions: 7.7243
+mean_spurious_fails: 0.1937
 ```
 
 Across 3,000 simulated evals of a system that genuinely meets the threshold on all twelve sub-components, the single question returns a decisive PASS 94.8 percent of the time, an average of 7.7 of the 12 sub-components come back indeterminate, and 17.8 percent of runs contain at least one FAIL that is not real. That last figure is below the 26.2 percent ceiling for twelve independent comparisons because only eight of the twelve dimensions sit near the bar; the four strong ones essentially never fail by chance.
@@ -150,7 +154,10 @@ item_0001,roleplay_persona,0
 evalpower results.csv --threshold 0.85
 evalpower results.csv --threshold 0.90 --confidence 0.99 --output report.md
 evalpower results.csv --fail-on-indeterminate   # exit code 2, for CI
+evalpower results.csv --json --output report.json   # machine readable, for scripts and CI
 ```
+
+`--json` writes the same analysis as a JSON document instead of the markdown report: every dimension's n, passes, rate, both intervals, both verdicts, p values and (when indeterminate) its sample size requirement, plus the pooled aggregate and the list of dimensions that changed verdict under adjustment. It composes with `--fail-on-indeterminate`: the report is still written, and the exit code still signals whether to fail the build.
 
 Or as a library:
 
