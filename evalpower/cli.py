@@ -16,7 +16,7 @@ from .metrics import (
     DEFAULT_CONFIDENCE,
     DEFAULT_DISAGREEMENT_TOLERANCE,
 )
-from .report import analyze, render_markdown
+from .report import analyze, render_json, render_markdown
 from .verdicts import DEFAULT_THRESHOLD, Verdict
 
 __all__ = ["build_parser", "load_results", "main"]
@@ -119,6 +119,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="write the report here instead of stdout",
     )
     parser.add_argument(
+        "--json",
+        action="store_true",
+        help="write the analysis as JSON instead of a markdown report, for scripts and CI",
+    )
+    parser.add_argument(
         "--fail-on-indeterminate",
         action="store_true",
         help="exit non-zero when any dimension is indeterminate, for use in CI",
@@ -155,7 +160,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("evalpower: {0}".format(error), file=sys.stderr)
         return 1
 
-    report = render_markdown(analysis)
+    report = render_json(analysis) if args.json else render_markdown(analysis)
     if args.output is None:
         sys.stdout.write(report)
     else:

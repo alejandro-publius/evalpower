@@ -21,7 +21,7 @@ from .metrics import (
     z_for_confidence,
 )
 from .planning import SampleSizeRequirement, required_n, requirement_for
-from .report import Analysis, DimensionAnalysis, analyze, render_markdown
+from .report import Analysis, DimensionAnalysis, analysis_to_dict, analyze, render_json, render_markdown
 from .verdicts import (
     Verdict,
     benjamini_hochberg,
@@ -38,11 +38,13 @@ __all__ = [
     "Interval",
     "SampleSizeRequirement",
     "Verdict",
+    "analysis_to_dict",
     "analyze",
     "benjamini_hochberg",
     "bootstrap_interval",
     "pass_rate",
     "pooled_metrics",
+    "render_json",
     "render_markdown",
     "required_n",
     "requirement_for",
