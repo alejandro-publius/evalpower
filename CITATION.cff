@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "evalpower: does this eval have enough data to support its verdict?"
+abstract: >-
+  Checks whether a pass/fail eval result set has enough data to support the
+  verdict it printed. Reports Wilson score and bootstrap percentile
+  intervals per dimension, three way PASS/FAIL/INDETERMINATE verdicts,
+  Benjamini-Hochberg adjustment for testing several dimensions against the
+  same threshold at once, and the closed form sample size that would resolve
+  an indeterminate dimension.
+type: software
+version: "0.1.0"
+date-released: "2026-09-07"
+license: MIT
+repository-code: "https://github.com/alejandro-publius/evalpower"
+keywords:
+  - evaluation
+  - statistics
+  - confidence-interval
+  - ai-safety
+  - governance
+  - sample-size
+  - multiple-comparisons
+authors:
+  - given-names: Alejandro
+    family-names: Velazquez
+    affiliation: "University of California, Berkeley (Computer Science)"
+    email: alejandro-publius@berkeley.edu
+    orcid: "https://orcid.org/0009-0007-9798-1958"
