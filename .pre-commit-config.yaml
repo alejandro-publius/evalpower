@@ -1,0 +1,11 @@
+# pip install pre-commit && pre-commit install
+#
+# Only the ruff lint hook is enabled, not ruff-format: the codebase's line
+# length (pyproject.toml sets 120) was chosen to fit code that is already
+# hand-formatted around its comments, particularly the worked arithmetic in
+# tests/, and an automatic formatter pass would rewrap it.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.6
+    hooks:
+      - id: ruff-check
