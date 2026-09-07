@@ -1,4 +1,4 @@
-"""Assemble the analysis and render it as markdown.
+"""Assemble the analysis and render it as markdown or JSON.
 
 The report answers one question: does this eval have enough data to support
 the verdict it just printed?
@@ -6,8 +6,9 @@ the verdict it just printed?
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -17,6 +18,7 @@ from .metrics import (
     DEFAULT_CONFIDENCE,
     DEFAULT_DISAGREEMENT_TOLERANCE,
     DimensionMetrics,
+    Interval,
     mean_interval_width,
     pooled_metrics,
     summarize_dimensions,
@@ -36,7 +38,7 @@ from .verdicts import (
     verdict_from_pvalues,
 )
 
-__all__ = ["Analysis", "DimensionAnalysis", "analyze", "render_markdown"]
+__all__ = ["Analysis", "DimensionAnalysis", "analyze", "analysis_to_dict", "render_json", "render_markdown"]
 
 
 @dataclass(frozen=True)
@@ -153,6 +155,110 @@ def analyze(
             [item.dimension for item in metrics], verdicts, adjusted_verdicts
         ),
     )
+
+
+def _interval_to_dict(interval: Interval) -> Dict[str, float]:
+    """Return an :class:`~evalpower.metrics.Interval` as a JSON-safe dict."""
+    return {"lower": interval.lower, "upper": interval.upper}
+
+
+def _metrics_to_dict(metrics: DimensionMetrics) -> Dict[str, Any]:
+    """Return a :class:`~evalpower.metrics.DimensionMetrics` as a JSON-safe dict."""
+    return {
+        "dimension": metrics.dimension,
+        "n": metrics.n,
+        "passes": metrics.passes,
+        "rate": metrics.rate,
+        "wilson": _interval_to_dict(metrics.wilson),
+        "bootstrap": _interval_to_dict(metrics.bootstrap),
+        "disagreement": metrics.disagreement,
+    }
+
+
+def _requirement_to_dict(requirement: Optional[SampleSizeRequirement]) -> Optional[Dict[str, Any]]:
+    """Return a :class:`~evalpower.planning.SampleSizeRequirement` as a dict, or None."""
+    if requirement is None:
+        return None
+    resolves_to = requirement.would_resolve_to
+    return {
+        "current_n": requirement.current_n,
+        "observed_rate": requirement.observed_rate,
+        "required_n": requirement.required_n,
+        "additional_items": requirement.additional_items,
+        "multiple_of_current": requirement.multiple_of_current,
+        "would_resolve_to": str(resolves_to) if resolves_to is not None else None,
+    }
+
+
+def _dimension_to_dict(item: DimensionAnalysis) -> Dict[str, Any]:
+    """Return a :class:`DimensionAnalysis` as a JSON-safe dict."""
+    payload = _metrics_to_dict(item.metrics)
+    payload.update(
+        {
+            "verdict": str(item.verdict),
+            "adjusted_verdict": str(item.adjusted_verdict),
+            "p_pass": item.p_pass,
+            "p_fail": item.p_fail,
+            "adjusted_p_pass": item.adjusted_p_pass,
+            "adjusted_p_fail": item.adjusted_p_fail,
+            "requirement": _requirement_to_dict(item.requirement),
+        }
+    )
+    return payload
+
+
+def analysis_to_dict(analysis: Analysis) -> Dict[str, Any]:
+    """Return a complete :class:`Analysis` as a plain, JSON-safe dict.
+
+    Every field the markdown report renders is present here too, in the same
+    units (rates as fractions, not percentages; p values unrounded), so a
+    caller can gate a build on it without re-parsing prose.
+
+    Args:
+        analysis: The analysis to convert.
+
+    Returns:
+        A nested ``dict`` of built-in types, ready for :func:`json.dumps`.
+    """
+    return {
+        "source": analysis.source,
+        "threshold": analysis.threshold,
+        "confidence": analysis.confidence,
+        "fdr_q": analysis.fdr_q,
+        "n_rows": analysis.n_rows,
+        "n_items": analysis.n_items,
+        "k": analysis.k,
+        "dimensions": [_dimension_to_dict(item) for item in analysis.dimensions],
+        "aggregate": _metrics_to_dict(analysis.aggregate),
+        "aggregate_verdict": str(analysis.aggregate_verdict),
+        "changes": [
+            {
+                "dimension": change.dimension,
+                "unadjusted": str(change.unadjusted),
+                "adjusted": str(change.adjusted),
+            }
+            for change in analysis.changes
+        ],
+    }
+
+
+def render_json(analysis: Analysis, indent: Optional[int] = 2) -> str:
+    """Render an :class:`Analysis` as a JSON document.
+
+    Carries the same information as :func:`render_markdown` in a shape meant
+    for machines rather than terminals: a CI step can parse it and gate a
+    build on ``aggregate_verdict`` or on any per dimension ``verdict``
+    without scraping markdown.
+
+    Args:
+        analysis: The analysis to render.
+        indent: Passed straight to :func:`json.dumps`; ``None`` renders
+            compact single-line JSON instead of pretty-printed output.
+
+    Returns:
+        A JSON document as a single string, ending in a newline.
+    """
+    return json.dumps(analysis_to_dict(analysis), indent=indent) + "\n"
 
 
 def _format_p(value: float) -> str:
