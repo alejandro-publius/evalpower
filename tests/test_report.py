@@ -145,6 +145,57 @@ def test_cli_can_fail_a_build_on_indeterminate_dimensions(tmp_path: Path) -> Non
     assert code == 2
 
 
+def test_cli_fails_a_build_when_only_the_aggregate_is_indeterminate(tmp_path: Path) -> None:
+    # 25 items at 10/25 (rate 0.40) is a decisive FAIL: its Wilson upper
+    # bound sits well below the 0.85 threshold. 135 items at 125/135 (rate
+    # 0.926) is a decisive PASS: its Wilson lower bound sits well above it.
+    # Every per dimension verdict is therefore decisive. But pooling both
+    # into one estimate (160 items, 135 passes, rate 0.8438) lands close
+    # enough to the threshold that the pooled Wilson interval straddles it:
+    # the aggregate verdict is INDETERMINATE even though no dimension is.
+    # A CI gate that only checks per dimension verdicts would exit 0 here,
+    # while the report it just wrote says INDETERMINATE in the aggregate
+    # row -- the tool would disagree with itself.
+    rows = [("A-{0}".format(i), "A", 1 if i < 10 else 0) for i in range(25)]
+    rows += [("B-{0}".format(i), "B", 1 if i < 125 else 0) for i in range(135)]
+    input_path = tmp_path / "aggregate_indeterminate.csv"
+    _frame(rows).to_csv(input_path, index=False)
+
+    analysis = analyze(pd.read_csv(input_path), threshold=0.85, resamples=200, seed=0)
+    assert all(item.verdict is not Verdict.INDETERMINATE for item in analysis.dimensions)
+    assert analysis.aggregate_verdict is Verdict.INDETERMINATE
+
+    output = tmp_path / "report.md"
+    code = main(
+        [
+            str(input_path),
+            "--bootstrap-resamples",
+            "200",
+            "--output",
+            str(output),
+            "--fail-on-indeterminate",
+        ]
+    )
+    assert "INDETERMINATE" in output.read_text(encoding="utf-8")
+    assert code == 2
+
+    json_output = tmp_path / "report.json"
+    json_code = main(
+        [
+            str(input_path),
+            "--bootstrap-resamples",
+            "200",
+            "--json",
+            "--output",
+            str(json_output),
+            "--fail-on-indeterminate",
+        ]
+    )
+    payload = json.loads(json_output.read_text(encoding="utf-8"))
+    assert payload["aggregate_verdict"] == "INDETERMINATE"
+    assert json_code == 2
+
+
 def test_committed_examples_hold_identical_evidence() -> None:
     # The two files must differ only in the dimension column. If they ever
     # stop being the same 600 outcomes, the comparison in the README stops
