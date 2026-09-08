@@ -126,7 +126,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fail-on-indeterminate",
         action="store_true",
-        help="exit non-zero when any dimension is indeterminate, for use in CI",
+        help=(
+            "exit non-zero when any dimension, or the pooled aggregate, is "
+            "indeterminate, for use in CI"
+        ),
     )
     return parser
 
@@ -139,7 +142,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     Returns:
         0 on success, 1 on a bad input, and 2 when
-        ``--fail-on-indeterminate`` is set and a dimension is indeterminate.
+        ``--fail-on-indeterminate`` is set and a dimension, or the pooled
+        aggregate, is indeterminate.
     """
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -167,8 +171,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         args.output.write_text(report, encoding="utf-8")
         print("wrote {0}".format(args.output), file=sys.stderr)
 
-    if args.fail_on_indeterminate and any(
-        item.verdict is Verdict.INDETERMINATE for item in analysis.dimensions
+    if args.fail_on_indeterminate and (
+        analysis.aggregate_verdict is Verdict.INDETERMINATE
+        or any(item.verdict is Verdict.INDETERMINATE for item in analysis.dimensions)
     ):
         return 2
     return 0
