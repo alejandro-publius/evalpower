@@ -228,3 +228,21 @@ def test_verdict_counts_always_reports_all_three() -> None:
     assert counts[Verdict.PASS] == 2
     assert counts[Verdict.INDETERMINATE] == 1
     assert counts[Verdict.FAIL] == 0
+
+
+def test_verdict_from_interval_rejects_thresholds_outside_unit_range() -> None:
+    # verdict_from_interval is public API (re-exported from evalpower/__init__
+    # and used directly by examples/generate.py) that decides PASS/FAIL/
+    # INDETERMINATE from a raw threshold. 0.0 and 1.0 are deliberately valid
+    # (pinned in tests/test_oracle.py::
+    # test_verdict_from_interval_pinned_behaviour_at_degenerate_thresholds),
+    # so this does not touch those. But nothing outside [0, 1] is a bar of any
+    # kind -- a stray percentage (85 instead of 0.85) or a sign error -- and
+    # before this fix it was silently rewarded with a confident PASS (any
+    # threshold below the interval's lower bound, including any negative
+    # number) or FAIL (any threshold above the interval's upper bound,
+    # including anything greater than 1) for literally every interval.
+    interval = Interval(0.4, 0.6)
+    for bad in (-0.2, -5.0, 1.4, 85.0):
+        with pytest.raises(ValueError):
+            verdict_from_interval(interval, bad)

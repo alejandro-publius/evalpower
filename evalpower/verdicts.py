@@ -72,7 +72,22 @@ def verdict_from_interval(interval: Interval, threshold: float = DEFAULT_THRESHO
 
     Returns:
         The verdict the evidence supports.
+
+    Raises:
+        ValueError: if ``threshold`` lies outside [0, 1]. 0 and 1 themselves
+            are allowed (and their behaviour is pinned in
+            ``tests/test_oracle.py``: 0 always passes, since every lower
+            bound already clears it, and 1 is indeterminate rather than a
+            perpetual fail, since a saturated interval's upper bound can sit
+            exactly at 1 too). A threshold outside [0, 1] is not a valid bar
+            at all -- a stray percentage (85 instead of 0.85) or a sign
+            error -- and left unchecked it is silently rewarded with a
+            confident PASS or FAIL for every possible interval, which is the
+            failure mode this function exists to prevent, not commit.
     """
+    threshold = float(threshold)
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError("threshold must lie in [0, 1], got {0!r}".format(threshold))
     if interval.lower >= threshold:
         return Verdict.PASS
     if interval.upper < threshold:
