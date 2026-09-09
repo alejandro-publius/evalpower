@@ -153,12 +153,13 @@ def test_required_n_on_the_fail_side_matches_statsmodels_wilson_interval() -> No
 
 
 def test_verdict_from_interval_pinned_behaviour_at_degenerate_thresholds() -> None:
-    # verdict_from_interval takes threshold as a plain float and does not
-    # itself validate it (score_test_z and required_n do; this function does
-    # not need to, since a bound comparison is well defined for any float).
-    # Called directly with a threshold of 0 or 1, its behaviour is pinned
-    # here rather than left to chance: a threshold of 0 always passes,
-    # because every Wilson lower bound is already at or above 0.
+    # verdict_from_interval accepts a threshold of exactly 0 or 1, same as
+    # score_test_z and required_n do (it rejects anything outside [0, 1] --
+    # see test_verdict_from_interval_rejects_thresholds_outside_unit_range in
+    # tests/test_verdicts.py). Called directly with a threshold of 0 or 1,
+    # its behaviour is pinned here rather than left to chance: a threshold of
+    # 0 always passes, because every Wilson lower bound is already at or
+    # above 0.
     interval = wilson_interval(1, 20, confidence=0.95)
     assert verdict_from_interval(interval, 0.0) is Verdict.PASS
     # A threshold of 1 never passes for a finite sample: the Wilson lower
