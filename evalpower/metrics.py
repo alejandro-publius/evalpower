@@ -31,6 +31,7 @@ __all__ = [
     "normal_cdf",
     "normal_ppf",
     "pass_rate",
+    "pooled_independence_note",
     "pooled_metrics",
     "summarize_dimensions",
     "validate_results",
@@ -279,6 +280,39 @@ def interval_disagreement(
             "read the Wilson bound {0} instead".format(wilson.format())
         )
     return "bounds differ by {0:.3f} (lower) and {1:.3f} (upper)".format(lower_gap, upper_gap)
+
+
+def pooled_independence_note(n_rows: int, n_items: int) -> Optional[str]:
+    """Return a note when the pooled estimate's independence assumption fails.
+
+    Both interval estimators treat the ``n`` rows they are given as ``n``
+    independent Bernoulli draws. That holds when each item is scored on one
+    dimension, which is the shape the shipped examples use. It does not hold
+    when the same item is scored on several dimensions: those rows share an
+    item and move together, so the pooled estimate has fewer independent
+    units than rows and its interval is narrower than the evidence supports.
+
+    A too narrow interval is exactly how a verdict becomes more confident
+    than the evidence -- the error this package exists to catch -- so the
+    pooled row says so rather than printing a bound it cannot support.
+
+    Args:
+        n_rows: Number of (item, dimension) rows pooled.
+        n_items: Number of distinct items those rows came from.
+
+    Returns:
+        A short explanation when items are reused across dimensions,
+        otherwise None.
+    """
+    n_rows, n_items = int(n_rows), int(n_items)
+    if n_items <= 0 or n_rows <= n_items:
+        return None
+    return (
+        "pooled over {0} rows from only {1} distinct items ({2:.1f} rows per "
+        "item), so the rows are not independent and this interval is narrower "
+        "than the evidence supports; read the per dimension rows, or pool one "
+        "dimension at a time".format(n_rows, n_items, n_rows / n_items)
+    )
 
 
 @dataclass(frozen=True)

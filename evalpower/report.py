@@ -20,6 +20,7 @@ from .metrics import (
     DimensionMetrics,
     Interval,
     mean_interval_width,
+    pooled_independence_note,
     pooled_metrics,
     summarize_dimensions,
     validate_results,
@@ -74,6 +75,11 @@ class Analysis:
     aggregate: DimensionMetrics
     aggregate_verdict: Verdict
     changes: List[VerdictChange]
+
+    @property
+    def pooled_independence(self) -> Optional[str]:
+        """Return a note when pooling treats correlated rows as independent."""
+        return pooled_independence_note(self.n_rows, self.n_items)
 
     @property
     def k(self) -> int:
@@ -231,6 +237,7 @@ def analysis_to_dict(analysis: Analysis) -> Dict[str, Any]:
         "dimensions": [_dimension_to_dict(item) for item in analysis.dimensions],
         "aggregate": _metrics_to_dict(analysis.aggregate),
         "aggregate_verdict": str(analysis.aggregate_verdict),
+        "pooled_independence": analysis.pooled_independence,
         "changes": [
             {
                 "dimension": change.dimension,
@@ -499,6 +506,12 @@ def _aggregate(analysis: Analysis) -> List[str]:
         ),
         "",
     ]
+    if analysis.pooled_independence:
+        lines.append(
+            "Treat the pooled interval above as a lower bound on the "
+            "uncertainty: {0}.".format(analysis.pooled_independence)
+        )
+        lines.append("")
     if aggregate.disagreement:
         lines.append("Interval disagreement on the pooled estimate: {0}.".format(aggregate.disagreement))
         lines.append("")

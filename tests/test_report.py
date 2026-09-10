@@ -14,8 +14,9 @@ import pandas as pd
 import pytest
 
 from evalpower.cli import load_results, main
+from evalpower.metrics import wilson_interval
 from evalpower.report import analysis_to_dict, analyze, render_json, render_markdown
-from evalpower.verdicts import Verdict
+from evalpower.verdicts import Verdict, verdict_from_interval
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
@@ -376,3 +377,66 @@ def test_cli_rejects_a_threshold_of_zero_one_or_out_of_range(
     err = capsys.readouterr().err
     assert "evalpower:" in err
     assert "threshold" in err
+
+
+# ---- pooling correlated rows --------------------------------------------- #
+
+
+def _cross_scored_frame(n_items: int = 40, n_dims: int = 10, n_passing: int = 30) -> pd.DataFrame:
+    """Every item scored on every dimension -- the shape `validate_results`
+    documents ("one row per (item, dimension) pair") and explicitly permits.
+
+    Quality is a property of the *item*, so an item's rows move together. A
+    deterministic pattern keeps the test exact: the first `n_passing` items
+    pass every dimension, the rest fail every dimension.
+    """
+    rows = []
+    for i in range(n_items):
+        passes = 1 if i < n_passing else 0
+        for d in range(n_dims):
+            rows.append((f"item{i}", f"dim{d}", passes))
+    return _frame(rows)
+
+
+def test_pooled_row_flags_that_it_pooled_correlated_rows() -> None:
+    analysis = analyze(_cross_scored_frame(), resamples=200, seed=0)
+    assert analysis.n_rows == 400
+    assert analysis.n_items == 40
+    note = analysis.pooled_independence
+    assert note is not None
+    assert "400 rows" in note and "40 distinct items" in note
+    assert note in render_markdown(analysis)
+    assert analysis_to_dict(analysis)["pooled_independence"] == note
+
+
+def test_pooled_interval_is_narrower_than_the_independent_units_support() -> None:
+    """The concrete harm. 30 of 40 items pass every dimension, so the evidence
+    is 40 independent units at 0.75, not 400 draws. Pooling as if there were
+    400 tightens the interval enough to return a *confident* verdict at the
+    package's own default threshold, where the item-level evidence supports
+    none. The note is what stops that being read as certainty."""
+    analysis = analyze(_cross_scored_frame(), threshold=0.85, resamples=200, seed=0)
+    assert (analysis.n_rows, analysis.n_items) == (400, 40)
+    assert analysis.aggregate.rate == pytest.approx(0.75)
+
+    # Reported, with the 400 rows treated as independent: a confident FAIL.
+    assert analysis.aggregate_verdict is Verdict.FAIL
+    assert analysis.aggregate.wilson.upper < 0.85
+
+    # The real number of independent units is 40. Same rate, and the interval
+    # straddles the threshold: the evidence decides nothing.
+    honest = wilson_interval(30, 40, analysis.confidence)
+    assert honest.lower < 0.85 < honest.upper
+    assert verdict_from_interval(honest, 0.85) is Verdict.INDETERMINATE
+    assert honest.width > 2.5 * analysis.aggregate.wilson.width
+
+    assert analysis.pooled_independence is not None
+
+
+def test_examples_do_not_trigger_the_pooling_note() -> None:
+    """The committed examples score each item on exactly one dimension, so
+    pooling them is sound and the report must stay quiet about it."""
+    for name in ("decomposed.csv", "single_question.csv"):
+        analysis = analyze(load_results(EXAMPLES / name), resamples=200, seed=0)
+        assert analysis.pooled_independence is None
+        assert "not independent" not in render_markdown(analysis)
