@@ -3,6 +3,23 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/format/).
 
+## [Unreleased]
+
+### Added
+
+- A note on the pooled aggregate when the rows it pools are not independent.
+  Both interval estimators treat their `n` rows as `n` independent draws,
+  which fails when the same item is scored on several dimensions -- the shape
+  `validate_results` documents and permits. The pooled interval is then
+  narrower than the evidence supports, and can return a confident verdict
+  where the item level evidence supports none: 30 of 40 items passing every
+  one of 10 dimensions pools to a decisive FAIL at the default 0.85
+  threshold, while the same rate over the real 40 independent units is
+  INDETERMINATE. Exposed as `metrics.pooled_independence_note`, the
+  `Analysis.pooled_independence` property, a `pooled_independence` key in
+  `--json`, and a line in the markdown Aggregate section. The committed
+  examples score each item once, so their reports are unchanged.
+
 ## [0.1.0] - 2026-09-07
 
 ### Added

@@ -20,6 +20,7 @@ from evalpower.metrics import (
     normal_cdf,
     normal_ppf,
     pass_rate,
+    pooled_independence_note,
     pooled_metrics,
     summarize_dimensions,
     validate_results,
@@ -287,3 +288,25 @@ def test_mean_interval_width_grows_as_evidence_is_split() -> None:
 def test_mean_interval_width_requires_dimensions() -> None:
     with pytest.raises(ValueError):
         mean_interval_width([])
+
+
+# ---- pooled independence -------------------------------------------------- #
+
+
+def test_pooled_independence_note_is_silent_when_each_item_has_one_row() -> None:
+    # The shape the shipped examples use: 600 items, one dimension each.
+    assert pooled_independence_note(600, 600) is None
+
+
+def test_pooled_independence_note_fires_when_items_span_dimensions() -> None:
+    note = pooled_independence_note(600, 50)
+    assert note is not None
+    assert "600 rows" in note and "50 distinct items" in note
+    assert "12.0 rows per item" in note
+
+
+def test_pooled_independence_note_handles_degenerate_counts() -> None:
+    assert pooled_independence_note(0, 0) is None
+    assert pooled_independence_note(10, 0) is None
+    # Fewer rows than items cannot happen, but must not produce a note.
+    assert pooled_independence_note(5, 10) is None
