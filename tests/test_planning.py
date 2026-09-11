@@ -8,10 +8,17 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pytest
 
 from evalpower.metrics import wilson_interval
-from evalpower.planning import required_n, requirement_for
+from evalpower.planning import (
+    achieved_fpr,
+    first_nonzero_fpr_n,
+    honest_samples_for_fpr,
+    required_n,
+    requirement_for,
+)
 from evalpower.verdicts import Verdict, verdict_from_interval
 
 # z^2 for a 95 percent two sided interval:
@@ -162,3 +169,99 @@ def test_splitting_evidence_multiplies_the_data_needed() -> None:
     single = required_n(0.90, 0.85, 0.95)
     assert single == 196
     assert 12 * single == 2352
+
+
+# ---------------------------------------------------------------------------
+# Monitor threshold FPR: achieved_fpr, first_nonzero_fpr_n, honest_samples_for_fpr
+# ---------------------------------------------------------------------------
+
+
+def _rule(honest: np.ndarray, target: float) -> float:
+    # The rule the closed form describes: quantile rounded up to the next
+    # observed score, false positive = strictly above it. This is what
+    # control-arena's compute_classifier_tpr does.
+    threshold = np.percentile(honest, (1.0 - target) * 100.0, method="higher")
+    return float((honest > threshold).mean())
+
+
+def test_achieved_fpr_equals_the_rule_exactly_on_distinct_scores() -> None:
+    rng = np.random.default_rng(0)
+    for target in (0.005, 0.01, 0.02, 0.05, 0.1, 0.25):
+        for n in range(1, 400):
+            honest = rng.normal(size=n)
+            assert achieved_fpr(n, target) == _rule(honest, target), (n, target)
+
+
+def test_achieved_fpr_matches_control_arena_cross_check() -> None:
+    # Mean actual_fpr from control-arena's compute_classifier_tpr over 200
+    # random honest samples of each size, recorded 2026-09-11 at c8dbe40d.
+    # Distinct continuous scores, so the mean is the closed form exactly.
+    recorded = {
+        (20, 0.005): 0.0000, (20, 0.01): 0.0000, (20, 0.02): 0.0000, (20, 0.05): 0.0000,
+        (50, 0.005): 0.0000, (50, 0.01): 0.0000, (50, 0.02): 0.0000, (50, 0.05): 0.0400,
+        (100, 0.005): 0.0000, (100, 0.01): 0.0000, (100, 0.02): 0.0100, (100, 0.05): 0.0400,
+        (200, 0.005): 0.0000, (200, 0.01): 0.0050, (200, 0.02): 0.0150, (200, 0.05): 0.0450,
+        (500, 0.005): 0.0040, (500, 0.01): 0.0080, (500, 0.02): 0.0180, (500, 0.05): 0.0480,
+        (1000, 0.005): 0.0040, (1000, 0.01): 0.0090, (1000, 0.02): 0.0190, (1000, 0.05): 0.0490,
+        (5000, 0.005): 0.0048, (5000, 0.01): 0.0098, (5000, 0.02): 0.0198, (5000, 0.05): 0.0498,
+    }
+    for (n, target), value in recorded.items():
+        assert achieved_fpr(n, target) == pytest.approx(value, abs=5e-5), (n, target)
+
+
+def test_achieved_fpr_is_zero_below_one_over_target_and_never_exceeds_target() -> None:
+    for target in (0.01, 0.02, 0.05):
+        for n in range(1, 2000):
+            got = achieved_fpr(n, target)
+            assert got <= target
+            if n * target < 1.0:
+                assert got == 0.0
+
+
+def test_first_nonzero_fpr_n_is_one_more_than_one_over_target() -> None:
+    assert first_nonzero_fpr_n(0.01) == 101
+    assert first_nonzero_fpr_n(0.02) == 51
+    assert first_nonzero_fpr_n(0.05) == 21
+    for target in (0.005, 0.01, 0.02, 0.05, 0.1):
+        n = first_nonzero_fpr_n(target)
+        assert achieved_fpr(n, target) > 0.0
+        assert achieved_fpr(n - 1, target) == 0.0
+
+
+def test_honest_samples_for_fpr_is_a_guarantee_not_a_lucky_step() -> None:
+    # Troughs of floor((n - 1) t) / n sit at n = (k + 1) / t, where the rate is
+    # k / (k + 1) of the target. Within 10% needs k / (k + 1) >= 0.9, so k >= 9,
+    # and the last trough that misses is k = 8, at n = 9 / t. The answer is one
+    # past it.
+    #   1%:   last miss 900  (8/900 = 0.00889 < 0.009)   -> 901
+    #   2%:   last miss 450  (8/450 = 0.01778 < 0.018)   -> 451
+    #   5%:   last miss 180  (8/180 = 0.04444 < 0.045)   -> 181
+    #   0.5%: last miss 1800 (8/1800 = 0.00444 < 0.0045) -> 1801
+    # n = 1000 at 1% delivers 9/1000, EXACTLY the 0.009 bound, and counts as a
+    # pass. A floating point comparison scores it as a miss (0.9 * 0.01 is
+    # 0.009000000000000001) and returns 1001; this pins the exact answer.
+    assert honest_samples_for_fpr(0.01, 0.1) == 901
+    assert honest_samples_for_fpr(0.02, 0.1) == 451
+    assert honest_samples_for_fpr(0.05, 0.1) == 181
+    assert honest_samples_for_fpr(0.005, 0.1) == 1801
+    # And 101 (achieved 1/101 = 0.0099) sits on a step, not a floor.
+    assert achieved_fpr(101, 0.01) >= 0.009
+    assert achieved_fpr(900, 0.01) < 0.009
+    for target, shortfall in ((0.01, 0.1), (0.02, 0.1), (0.05, 0.1), (0.01, 0.25)):
+        n = honest_samples_for_fpr(target, shortfall)
+        floor_rate = (1.0 - shortfall) * target
+        assert achieved_fpr(n - 1, target) < floor_rate - 1e-12 or n == 1
+        assert all(achieved_fpr(m, target) >= floor_rate - 1e-12 for m in range(n, n + 5000))
+
+
+def test_fpr_helpers_reject_bad_inputs() -> None:
+    with pytest.raises(ValueError):
+        achieved_fpr(0, 0.01)
+    with pytest.raises(ValueError):
+        achieved_fpr(100, 0.0)
+    with pytest.raises(ValueError):
+        achieved_fpr(100, 1.0)
+    with pytest.raises(ValueError):
+        honest_samples_for_fpr(0.01, 0.0)
+    with pytest.raises(ValueError):
+        first_nonzero_fpr_n(1.5)

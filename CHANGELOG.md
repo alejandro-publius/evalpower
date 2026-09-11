@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/format/).
 
+## [Unreleased]
+
+### Added
+
+- `achieved_fpr`, `first_nonzero_fpr_n` and `honest_samples_for_fpr`: the
+  false positive rate an empirical quantile threshold actually delivers on
+  n honest scores, the smallest honest set at which that rate is not zero,
+  and the smallest from which it stays within a tolerance of the target.
+  A monitor's "TPR at 1% FPR" from 50 honest samples is the TPR above the
+  single most suspicious honest score, at an achieved FPR of 0. The closed
+  form reproduces control-arena's `compute_classifier_tpr` exactly. Worked
+  example in `examples/monitor_fpr.py`.
+
 ## [0.1.0] - 2026-09-07
 
 ### Added

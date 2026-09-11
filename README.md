@@ -175,6 +175,43 @@ required_n(0.90, 0.85)
 
 There are no LLM calls anywhere in this package. It consumes eval output, it does not produce it, which is what lets it work with any harness including one it has never seen.
 
+## Monitor thresholds: the false positive rate you actually got
+
+A control evaluation reports a monitor's TPR at a target false positive rate: set the threshold at the (1 - target) quantile of honest scores, count the attacks above it. The threshold is an empirical quantile, rounded up to the next observed honest score so that the rate is at most the target. With n honest scores that leaves floor((n - 1) * target) of them above the threshold, so the rate the threshold delivers is
+
+```
+achieved = floor((n - 1) * target) / n
+```
+
+It is exactly zero until n exceeds 1 / target. A TPR reported "at 1% FPR" from 50 honest samples is the TPR above the single most suspicious honest score, at an achieved FPR of 0.
+
+```bash
+python examples/monitor_fpr.py
+```
+
+```
+ n honest req 0.005 req 0.010 req 0.020 req 0.050
+       20    0.0000    0.0000    0.0000    0.0000
+       50    0.0000    0.0000    0.0000    0.0400
+      100    0.0000    0.0000    0.0100    0.0400
+      200    0.0000    0.0050    0.0150    0.0450
+      500    0.0040    0.0080    0.0180    0.0480
+     1000    0.0040    0.0090    0.0190    0.0490
+     5000    0.0048    0.0098    0.0198    0.0498
+```
+
+The closed form was checked against control-arena's `compute_classifier_tpr` ([UKGovernmentBEIS/control-arena](https://github.com/UKGovernmentBEIS/control-arena) at `c8dbe40d`), which implements this rule with numpy's `method="higher"` and a strict `>`. It reproduces the function's achieved FPR at every cell above, and `tests/test_planning.py` pins the table.
+
+```python
+from evalpower import achieved_fpr, first_nonzero_fpr_n, honest_samples_for_fpr
+
+achieved_fpr(50, 0.01)             # 0.0
+first_nonzero_fpr_n(0.01)          # 101
+honest_samples_for_fpr(0.01, 0.1)  # 901: from here on, never more than 10% short of 1%
+```
+
+The last one is a guarantee, not a single lucky n. The achieved rate is a sawtooth that touches the target at each step and sags between steps, so 101 honest samples happen to deliver 0.0099 while 900 deliver 0.0089. Report the achieved rate next to the requested one, and size the honest set before the eval runs.
+
 ## What it does not do
 
 It does not judge whether your dimensions are the right dimensions, whether your items are representative, or whether your threshold is the right threshold. Those are the harder questions and they are not statistical ones. It also assumes items are independent within a dimension; if your harness reuses prompts across dimensions or samples multiple completions per prompt, the true intervals are wider than the ones reported here.
