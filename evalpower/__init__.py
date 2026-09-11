@@ -20,7 +20,14 @@ from .metrics import (
     wilson_interval,
     z_for_confidence,
 )
-from .planning import SampleSizeRequirement, required_n, requirement_for
+from .planning import (
+    SampleSizeRequirement,
+    achieved_fpr,
+    first_nonzero_fpr_n,
+    honest_samples_for_fpr,
+    required_n,
+    requirement_for,
+)
 from .report import Analysis, DimensionAnalysis, analysis_to_dict, analyze, render_json, render_markdown
 from .verdicts import (
     Verdict,
@@ -38,10 +45,13 @@ __all__ = [
     "Interval",
     "SampleSizeRequirement",
     "Verdict",
+    "achieved_fpr",
     "analysis_to_dict",
     "analyze",
     "benjamini_hochberg",
     "bootstrap_interval",
+    "first_nonzero_fpr_n",
+    "honest_samples_for_fpr",
     "pass_rate",
     "pooled_metrics",
     "render_json",
