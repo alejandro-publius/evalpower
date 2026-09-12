@@ -3,6 +3,11 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/format/).
 
+## [Unreleased]
+
+### Added
+- Exact interval-coverage and verdict-calibration checks (`tests/test_coverage.py`, `examples/coverage.py`): a finite binomial sum showing the Wilson interval sits near nominal 95% coverage and that the three-way verdict's false-decision rate at the threshold oscillates above nominal (up to ~8%) on discrete counts. README gains an "Are the intervals calibrated?" section. Mutation-checked against three de-calibrations of the interval math.
+
 ## [0.1.0] - 2026-09-07
 
 ### Added

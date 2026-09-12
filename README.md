@@ -108,6 +108,32 @@ The consequence is uncomfortable: **the more faithfully a team follows the metho
 
 The Wilson interval is the inversion of the score test, so the interval verdicts and the p values are two views of one test and can never contradict each other. The closed form for required sample size falls out of the same identity. `tests/test_verdicts.py` proves the equivalence exhaustively at every possible count for several sample sizes.
 
+## Are the intervals calibrated?
+
+A tool that prints "95% interval" and decides PASS / FAIL / INDETERMINATE owes you a demonstration that those numbers mean what they say. `python examples/coverage.py` computes it exactly — no Monte Carlo, no seed. For a sample of size n at a true rate p, the coverage is a finite binomial sum over the counts whose interval contains p, evaluated against the `wilson_interval` and `verdict_from_interval` that ship.
+
+```
+WILSON 95% INTERVAL COVERAGE — exact
+    n  mean over p in [0.55, 0.98]   worst
+   50            0.952                0.922
+  100            0.950                0.933
+  600            0.951                0.945
+```
+
+The interval is well calibrated: coverage sits within a point of 0.95 and the worst-case dip pulls back toward nominal as n grows. But the three-way verdict is where the honesty is:
+
+```
+THREE-WAY VERDICT FALSE-DECISION RATE at the threshold — exact
+(the true rate equals the bar, so any PASS or FAIL is a wrong call)
+    n     t = 0.85
+   50      0.0442
+  100      0.0668   (> nominal 0.05)
+  200      0.0590   (> nominal 0.05)
+  600      0.0451
+```
+
+**A three-way verdict on discrete counts does not hold its error rate at 5%.** It oscillates above and below nominal — reaching ~8% at some sample sizes — because the counts are integers and the interval cannot land exactly on the bar. This is the standard behaviour of an interval test on a proportion, and it is exactly the kind of thing a "95%" label invites you to forget. It is also why `evalpower` reports `INDETERMINATE` generously and prices the sample size needed to resolve, rather than treating a PASS or FAIL that lands near the bar as decisive. `tests/test_coverage.py` pins all of this, and catches any change that would quietly de-calibrate the interval.
+
 ## Reproducing the examples
 
 ```bash
